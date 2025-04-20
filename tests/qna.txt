@@ -1,0 +1,18 @@
+Question:
+Authentication & Authorization (Implementation not required, only mention how it would be 
+structured) 
+o Assume that API consumers must be authenticated to manage events. 
+o Attendees should be able to register without authentication. 
+
+--
+For this we will use laravel sanctum that will use user authentication before proceeding
+// Public routes
+Route::get('events', [EventController::class, 'index']);
+Route::get('events/{id}', [EventController::class, 'show']);
+Route::apiResource('bookings', BookingController::class);
+
+// Protected routes
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('events', EventController::class)->except(['index', 'show']);
+});
+
