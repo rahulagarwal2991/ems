@@ -3,61 +3,73 @@
 namespace App\Http\Controllers;
 
 use App\Models\Attendee;
-use Illuminate\Http\Request;
+use App\Services\AttendeeService;
+use App\Http\Requests\StoreAttendeeRequest;
+use App\Http\Requests\UpdateAttendeeRequest;
+use App\Exceptions\AttendeeNotFoundException;
+use App\Exceptions\AttendeeOperationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 
 class AttendeeController extends Controller
 {
-    /**
-     * Display a listing of the attendees.
-     */
-    public function index()
+    protected AttendeeService $attendeeService;
+
+    public function __construct(AttendeeService $attendeeService)
     {
-        $attendees = Attendee::all();
-        return response()->json(['data' => $attendees]);
+        $this->attendeeService = $attendeeService;
     }
 
-    /**
-     * Store a newly created attendee in storage.
-     */
-    public function store(Request $request)
+    public function index(): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => 'required|string|max:100',
-            'email' => 'required|email|unique:attendees,email',
-        ]);
-
-        $attendee = Attendee::create($validated);
-        return response()->json(['data' => $attendee, 'message' => 'Attendee registered successfully'], 201);
+        try {
+            $attendees = $this->attendeeService->getAll();
+            return response()->json(['data' => $attendees]);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Unable to fetch attendees'], 500);
+        }
     }
 
-    /**
-     * Display the specified attendee.
-     */
-    public function show(Attendee $attendee)
+    public function store(StoreAttendeeRequest $request): JsonResponse
     {
-        return response()->json(['data' => $attendee]);
+        try {
+            $attendee = $this->attendeeService->create($request->validated());
+            return response()->json(['data' => $attendee, 'message' => 'Attendee registered successfully'], 201);
+        } catch (AttendeeOperationException $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
     }
 
-    /**
-     * Update the specified attendee in storage.
-     */
-    public function update(Request $request, Attendee $attendee)
+    public function show(Attendee $attendee): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:100',
-            'email' => 'sometimes|required|email|unique:attendees,email,' . $attendee->id,
-        ]);
-
-        $attendee->update($validated);
-        return response()->json(['data' => $attendee, 'message' => 'Attendee updated successfully']);
+        try {
+            return response()->json(['data' => $attendee]);
+        } catch (ModelNotFoundException $e) {
+            throw new AttendeeNotFoundException();
+        } catch (AttendeeOperationException $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Something went wrong'], 500);
+        }
     }
 
-    /**
-     * Remove the specified attendee from storage.
-     */
-    public function destroy(Attendee $attendee)
+    public function update(UpdateAttendeeRequest $request, Attendee $attendee): JsonResponse
     {
-        $attendee->delete();
-        return response()->json(['message' => 'Attendee deleted successfully']);
+        try {
+            $updated = $this->attendeeService->update($attendee, $request->validated());
+            return response()->json(['data' => $updated, 'message' => 'Attendee updated successfully']);
+        } catch (AttendeeOperationException $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    public function destroy(Attendee $attendee): JsonResponse
+    {
+        try {
+            $this->attendeeService->delete($attendee);
+            return response()->json(['message' => 'Attendee deleted successfully']);
+        } catch (AttendeeOperationException $e) {
+            return response()->json(['error' => $e->getMessage()], 400);
+        }
     }
 }

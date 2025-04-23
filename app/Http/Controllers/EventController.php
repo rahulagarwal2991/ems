@@ -3,65 +3,60 @@
 namespace App\Http\Controllers;
 
 use App\Models\Event;
-use Illuminate\Http\Request;
+use App\Services\EventService;
+use App\Http\Requests\StoreEventRequest;
+use App\Http\Requests\UpdateEventRequest;
+use Illuminate\Http\JsonResponse;
+use App\Exceptions\EventNotFoundException;
+use App\Exceptions\EventOperationException;
 
 class EventController extends Controller
 {
-    /**
-     * Display a listing of the events.
-     */
-    public function index()
+    protected EventService $eventService;
+
+    public function __construct(EventService $eventService)
     {
-        $events = Event::all();
+        $this->eventService = $eventService;
+    }
+
+    public function index(): JsonResponse
+    {
+        $events = $this->eventService->getAll();
         return response()->json(['data' => $events]);
     }
 
-    /**
-     * Store a newly created event in storage.
-     */
-    public function store(Request $request)
+    public function store(StoreEventRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'date' => 'required|date',
-            'country' => 'required|string',
-            'capacity' => 'required|integer|min:1',
-        ]);
-
-        $event = Event::create($validated);
+        $event = $this->eventService->create($request->validated());
         return response()->json(['data' => $event, 'message' => 'Event created successfully'], 201);
     }
 
-    /**
-     * Display the specified event.
-     */
-    public function show(Event $event)
+    public function show(Event $event): JsonResponse
     {
-        return response()->json(['data' => $event]);
+        try {
+            return response()->json(['data' => $this->eventService->show($event)]);
+        } catch (\Exception $e) {
+            throw new EventNotFoundException();
+        }
     }
 
-    /**
-     * Update the specified event in storage.
-     */
-    public function update(Request $request, Event $event)
+    public function update(UpdateEventRequest $request, Event $event): JsonResponse
     {
-        $validated = $request->validate([
-            'title' => 'sometimes|required|string|max:255',
-            'date' => 'sometimes|required|date',
-            'country' => 'sometimes|required|string',
-            'capacity' => 'sometimes|required|integer|min:1',
-        ]);
-
-        $event->update($validated);
-        return response()->json(['data' => $event, 'message' => 'Event updated successfully']);
+        try {
+            $event = $this->eventService->update($event, $request->validated());
+            return response()->json(['data' => $event, 'message' => 'Event updated successfully']);
+        } catch (\Exception $e) {
+            throw new EventOperationException();
+        }
     }
 
-    /**
-     * Remove the specified event from storage.
-     */
-    public function destroy(Event $event)
+    public function destroy(Event $event): JsonResponse
     {
-        $event->delete();
-        return response()->json(['message' => 'Event deleted successfully']);
+        try {
+            $this->eventService->delete($event);
+            return response()->json(['message' => 'Event deleted successfully']);
+        } catch (\Exception $e) {
+            throw new EventOperationException();
+        }
     }
 }
